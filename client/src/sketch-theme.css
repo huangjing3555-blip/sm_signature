@@ -1,0 +1,468 @@
+/**
+ * Hand-Drawn Sketch Aesthetic Theme
+ * Morandi color palette with organic lines and irregular geometry
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  /* Morandi Color Palette - Soft, muted, sophisticated */
+  --color-cream: #f5f6fb;
+  --color-charcoal: #1f2c3a;
+  --color-sage: #2f4563;
+  --color-heading: #162433;
+  --color-body: #1f2c3a;
+  --color-subtle: #3a4f69;
+  --color-dusty-blue: #6f2f45;
+  --color-warm-taupe: #6b5a50;
+  --color-soft-terracotta: #b9806f;
+  --color-pale-green: #dce8f2;
+  --color-muted-mauve: #8d7e96;
+  --color-wine: #6f2f45;
+  --color-ink-green: #3f5f47;
+  --color-wine-soft: rgba(111, 47, 69, 0.12);
+  --color-wine-soft-strong: rgba(111, 47, 69, 0.2);
+  --color-ink-green-soft: rgba(63, 95, 71, 0.12);
+  --color-ink-green-soft-strong: rgba(63, 95, 71, 0.2);
+
+  /* Semantic colors */
+  --color-success: #7fb069;
+  --color-warning: #d4a574;
+  --color-error: #c97c7c;
+  --color-info: #3f5678;
+
+  /* Typography - Mixed styles for artistic feel */
+  --font-marker: "Caveat", cursive; /* Marker-style for titles */
+  --font-mono: "JetBrains Mono", monospace; /* Monospace for code */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+/* Light theme - default */
+[data-theme="light"] {
+  --background: var(--color-cream);
+  --foreground: var(--color-charcoal);
+  --card-bg: #faf8f5;
+  --border: #9aae95;
+  --accent: var(--color-wine);
+  --accent-foreground: white;
+  --secondary: var(--color-ink-green);
+  --secondary-foreground: white;
+}
+
+/* Global styles */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* Hand-drawn effect using SVG doodles and borders */
+.sketch-container {
+  position: relative;
+  background: var(--background);
+  padding: 2rem;
+}
+
+/* Organic border style - irregular edges */
+.sketch-card {
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  color: var(--color-body);
+  border-radius: 12px 3px 15px 8px; /* Irregular corners */
+  padding: 1.5rem;
+  position: relative;
+  box-shadow: 3px 5px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.sketch-card::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 20%;
+  width: 30%;
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--border) 0px,
+    var(--border) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  opacity: 0.3;
+}
+
+.sketch-card:hover {
+  border-color: var(--accent);
+  background: #ffffff;
+  box-shadow: 4px 8px 18px rgba(43, 59, 92, 0.16);
+  transform: translate(-1px, -1px);
+}
+
+/* Non-dashboard pages: use hover look as default + darker borders */
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card {
+  background: #ffffff;
+  box-shadow: 4px 8px 18px rgba(43, 59, 92, 0.16);
+  transform: none;
+}
+
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card:hover {
+  transform: translate(-1px, -1px);
+}
+
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card-tone-wine {
+  background: #ffffff;
+  border-color: #6f2f45;
+}
+
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card-tone-blue {
+  background: #ffffff;
+  border-color: #3f5678;
+}
+
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card-tone-green {
+  background: #ffffff;
+  border-color: #3f5f47;
+}
+
+.crypto-dashboard[data-page]:not([data-page="dashboard"]) .sketch-card-tone-taupe {
+  background: #ffffff;
+  border-color: #6b5a50;
+}
+
+/* Card tone system for page-wide visual grouping */
+.sketch-card-tone-wine {
+  background: var(--color-wine-soft);
+  border-color: #8f4b63;
+}
+
+.sketch-card-tone-blue {
+  background: rgba(63, 86, 120, 0.12);
+  border-color: #5f7190;
+}
+
+.sketch-card-tone-green {
+  background: var(--color-ink-green-soft);
+  border-color: #557a5d;
+}
+
+.sketch-card-tone-taupe {
+  background: rgba(107, 90, 80, 0.12);
+  border-color: #7f6a5f;
+}
+
+/* Marker-style headings */
+h1,
+h2,
+h3 {
+  font-family: var(--font-marker);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.5rem;
+  color: var(--color-heading);
+  margin: 0 0 0.5rem 0;
+}
+
+h2 {
+  font-size: 1.8rem;
+  color: var(--color-wine);
+  margin: 1.5rem 0 0.75rem 0;
+}
+
+h3 {
+  font-size: 1.3rem;
+  color: var(--color-ink-green);
+  margin: 1rem 0 0.5rem 0;
+}
+
+/* Monospace code/hash display */
+.code-display {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid var(--accent);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  word-break: break-all;
+  color: var(--color-charcoal);
+  line-height: 1.5;
+}
+
+/* Dashed divider - sketch style */
+.sketch-divider {
+  border: none;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--border) 0px,
+    var(--border) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  margin: 2rem 0;
+  opacity: 0.5;
+}
+
+/* Irregular geometry - rotated elements */
+.sketch-accent-box {
+  background: rgba(63, 95, 71, 0.1);
+  border: 1px dashed #8aa08c;
+  padding: 1.5rem;
+  border-radius: 8px 2px 10px 5px;
+  transform: rotate(-1deg);
+  margin: 1rem 0;
+}
+
+.sketch-accent-box.secondary {
+  background: rgba(111, 47, 69, 0.12);
+  border-color: #9b6f7f;
+  transform: rotate(1.5deg);
+}
+
+.sketch-accent-box.secondary h3 {
+  color: var(--color-wine) !important;
+}
+
+.sketch-accent-box.secondary p {
+  color: #2f3a4a !important;
+}
+
+/* Button styles - hand-drawn feel */
+.sketch-button {
+  font-family: var(--font-marker);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  border-radius: 6px 2px 7px 3px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.sketch-button:hover {
+  background: #5a2739;
+  border-color: #5a2739;
+  transform: translate(-1px, -2px);
+  box-shadow: 3px 6px 14px rgba(45, 64, 92, 0.22);
+}
+
+.sketch-button:active {
+  transform: translate(0, 0);
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sketch-button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.sketch-button.secondary:hover {
+  background: rgba(94, 126, 166, 0.14);
+}
+
+/* Input fields - sketch style */
+.sketch-input {
+  font-family: var(--font-sans);
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 5px 2px 6px 3px;
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.sketch-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--color-wine-soft);
+}
+
+/* Label styles */
+label {
+  font-family: var(--font-marker);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-wine);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.sketch-card h4,
+.sketch-card strong {
+  color: var(--color-heading);
+}
+
+.sketch-card p {
+  color: var(--color-body);
+}
+
+.sketch-card .text-subtle {
+  color: var(--color-subtle);
+}
+
+/* Status indicators */
+.status-badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px 2px 5px 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.status-badge.success {
+  background: rgba(127, 176, 105, 0.2);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.status-badge.error {
+  background: var(--color-wine-soft-strong);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.status-badge.warning {
+  background: rgba(212, 165, 116, 0.2);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+.status-badge.info {
+  background: var(--color-ink-green-soft-strong);
+  color: var(--color-ink-green);
+  border: 1px solid var(--color-ink-green);
+}
+
+/* Geometric accent shapes */
+.geo-accent {
+  position: absolute;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.geo-accent.triangle {
+  width: 0;
+  height: 0;
+  border-left: 30px solid transparent;
+  border-right: 30px solid transparent;
+  border-bottom: 52px solid var(--color-charcoal);
+}
+
+.geo-accent.circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px dashed var(--color-charcoal);
+}
+
+/* Sketch-style list */
+.sketch-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sketch-list li {
+  padding: 0.75rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  border-bottom: 1px dashed var(--border);
+}
+
+.sketch-list li:last-child {
+  border-bottom: none;
+}
+
+.sketch-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--color-success);
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* Animation - subtle and organic */
+@keyframes sketch-float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0.5deg);
+  }
+}
+
+.sketch-float {
+  animation: sketch-float 3s ease-in-out infinite;
+}
+
+@keyframes sketch-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.sketch-pulse {
+  animation: sketch-pulse 2s ease-in-out infinite;
+}
+
+/* Loading state */
+.sketch-loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sketch-container {
+    padding: 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  .sketch-card {
+    padding: 1rem;
+  }
+}
