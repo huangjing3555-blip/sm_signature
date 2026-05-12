@@ -1,7 +1,7 @@
 /**
  * GmSSL Wrapper - Provides Python subprocess-based access to gmssl library
  * This module executes Python scripts that use the gmssl library for SM2/SM3 operations
- * On Windows or when gmssl is unavailable, uses mock data for testing
+ * Using gmssl 3.2.2 API: CryptSM2 and sm3_hash
  */
 
 import { exec } from "child_process";
@@ -13,45 +13,20 @@ import * as crypto from "crypto";
 
 const execAsync = promisify(exec);
 
-let gmSSLAvailable = false;
-
 /**
  * Initialize gmssl Python environment
  * This should be called once during application startup
  */
 export async function initGmssl(): Promise<boolean> {
-  // 在 Windows 上或开发模式下，使用 Mock 数据
-  if (process.platform === "win32" || process.env.GMSSL_MOCK === "1") {
-    console.log("[GmSSL] Running in MOCK mode (Windows or GMSSL_MOCK=1)");
-    gmSSLAvailable = false;
-    return true; // 返回 true 表示初始化成功（使用 mock）
-  }
-
-  try {
-    // Check if gmssl is installed
-    const { stdout } = await execAsync("python3 -c 'import gmssl; print(gmssl.GMSSL_PYTHON_VERSION)'");
-    console.log("[GmSSL] Initialized successfully. Version:", stdout.trim());
-    gmSSLAvailable = true;
-    return true;
-  } catch (error) {
-    console.warn("[GmSSL] Failed to initialize - falling back to mock mode:", error);
-    gmSSLAvailable = false;
-    return true; // 返回 true 但使用 mock 模式
-  }
-}
-
-/**
- * Generate mock SM2 key pair (for testing on Windows)
- */
-function generateMockSm2KeyPair(): { publicKey: string; privateKey: string } {
-  // 生成伪 SM2 密钥对（用于测试）
-  const privateKeyBuffer = crypto.randomBytes(32);
-  const publicKeyBuffer = crypto.randomBytes(64);
-
-  return {
-    publicKey: publicKeyBuffer.toString("hex").toUpperCase(),
-    privateKey: privateKeyBuffer.toString("hex").toUpperCase(),
-  };
+	try {
+		// Check if gmssl is installed
+		const { stdout } = await execAsync("python3 -c 'from gmssl.sm2 import CryptSM2; from gmssl.sm3 import sm3_hash; print(\"GmSSL initialized\")'");
+		console.log("[GmSSL] Initialized successfully:", stdout.trim());
+		return true;
+	} catch (error) {
+		console.error("[GmSSL] Failed to initialize:", error);
+		return false;
+	}
 }
 
 /**
@@ -59,333 +34,240 @@ function generateMockSm2KeyPair(): { publicKey: string; privateKey: string } {
  * Returns { publicKey, privateKey } in hex format
  */
 export async function generateSm2KeyPair(): Promise<{
-  publicKey: string;
-  privateKey: string;
+	publicKey: string;
+	privateKey: string;
 }> {
-  // 如果 gmssl 不可用，使用 mock 数据
-  if (!gmSSLAvailable) {
-    console.log("[GmSSL] Using MOCK SM2 key pair generation");
-    return generateMockSm2KeyPair();
-  }
+	const pythonScript = `
+	import secrets
+	import json
+	from gmssl.sm2 import CryptSM2
 
-  const pythonScript = `
-import gmssl
-import json
+	try:
+		# Generate random private key (32 bytes = 64 hex characters)
+	private_key = secrets.token_hex(32)
 
-try:
-    # Generate SM2 key pair
-    key = gmssl.Sm2Key()
-    key.generate_key()
-    
-    public_key = key.get_public_key().hex()
-    private_key = key.get_private_key().hex()
-    
-    result = {
-        "success": True,
-        "publicKey": public_key,
-        "privateKey": private_key
-    }
-except Exception as e:
-    result = {
-        "success": False,
-        "error": str(e)
-    }
+	# Create SM2 instance and get public key
+	sm2_crypt = CryptSM2(private_key=private_key, public_key='')
+	public_key = sm2_crypt.public_key
 
-print(json.dumps(result))
-`;
+	result = {
+		"success": True,
+		"publicKey": public_key,
+		"privateKey": private_key
+	}
+	except Exception as e:
+		result = {
+		"success": False,
+		"error": str(e)
+	}
 
-  try {
-    const tmpFile = path.join(os.tmpdir(), `gmssl_keygen_${Date.now()}.py`);
-    fs.writeFileSync(tmpFile, pythonScript);
+	print(json.dumps(result))
+	`;
 
-    const { stdout } = await execAsync(`python3 "${tmpFile}"`);
-    const result = JSON.parse(stdout.trim());
+	try {
+		const tmpFile = path.join(os.tmpdir(), `gmssl_keygen_${Date.now()}.py`);
+		fs.writeFileSync(tmpFile, pythonScript);
 
-    fs.unlinkSync(tmpFile);
+		const { stdout } = await execAsync(`python3 "${tmpFile}"`);
+		const result = JSON.parse(stdout.trim());
 
-    if (!result.success) {
-      throw new Error(result.error || "Failed to generate SM2 key pair");
-    }
+		fs.unlinkSync(tmpFile);
 
-    return {
-      publicKey: result.publicKey,
-      privateKey: result.privateKey,
-    };
-  } catch (error) {
-    console.warn(`[GmSSL] SM2 key generation failed, falling back to mock: ${error}`);
-    return generateMockSm2KeyPair();
-  }
-}
+		if (!result.success) {
+			throw new Error(result.error || "Failed to generate SM2 key pair");
+		}
 
-/**
- * Calculate mock SM3 hash (for testing on Windows)
- */
-function calculateMockSm3Hash(data: string | Buffer): string {
-  // 使用 SHA256 作为 mock（长度相同）
-  const hash = crypto
-    .createHash("sha256")
-    .update(data)
-    .digest("hex")
-    .toUpperCase();
-  return hash;
+		console.log(`[GmSSL SM2] Key pair generated: ${result.publicKey.substring(0, 32)}...`);
+		return {
+			publicKey: result.publicKey,
+			privateKey: result.privateKey,
+		};
+	} catch (error) {
+		throw new Error(`SM2 key generation failed: ${error}`);
+	}
 }
 
 /**
  * Calculate SM3 hash
- * @param data - Input data as hex string or bytes
- * @param isHex - Whether input is hex encoded
+ * @param data - Input data as string or Buffer
  */
-export async function calculateSm3Hash(data: string | Buffer, isHex: boolean = false): Promise<string> {
-  // 如果 gmssl 不可用，使用 mock 数据
-  if (!gmSSLAvailable) {
-    console.log("[GmSSL] Using MOCK SM3 hash calculation");
-    return calculateMockSm3Hash(data);
-  }
+export async function calculateSm3Hash(data: string | Buffer): Promise<string> {
+	// Convert data to Buffer
+	const dataBuffer = typeof data === "string" ? Buffer.from(data, "utf-8") : data;
+	const dataBase64 = dataBuffer.toString("base64");
 
-  const pythonScript = `
-import gmssl
-import json
+	const pythonScript = `
+	import base64
+	import json
+	from gmssl.sm3 import sm3_hash
 
-try:
-    sm3 = gmssl.Sm3()
-    
-    # Handle input
-    if ${isHex}:
-        input_data = bytes.fromhex('${typeof data === "string" ? data : data.toString("hex")}')
-    else:
-        input_data = b'${typeof data === "string" ? data.replace(/'/g, "\\'") : data.toString().replace(/'/g, "\\'")}'
-    
-    sm3.update(input_data)
-    digest = sm3.digest()
-    
-    result = {
-        "success": True,
-        "hash": digest.hex()
-    }
-except Exception as e:
-    result = {
-        "success": False,
-        "error": str(e)
-    }
+	try:
+		# Decode base64 data
+	input_data = base64.b64decode('${dataBase64}')
 
-print(json.dumps(result))
-`;
+	# Convert to bytearray for sm3_hash
+		input_bytearray = bytearray(input_data)
 
-  try {
-    const tmpFile = path.join(os.tmpdir(), `gmssl_sm3_${Date.now()}.py`);
-    fs.writeFileSync(tmpFile, pythonScript);
+	# Calculate SM3 hash
+	hash_result = sm3_hash(input_bytearray)
 
-    const { stdout } = await execAsync(`python3 "${tmpFile}"`);
-    const result = JSON.parse(stdout.trim());
+	result = {
+		"success": True,
+		"hash": hash_result
+	}
+	except Exception as e:
+		result = {
+		"success": False,
+		"error": str(e)
+	}
 
-    fs.unlinkSync(tmpFile);
+	print(json.dumps(result))
+	`;
 
-    if (!result.success) {
-      throw new Error(result.error || "Failed to calculate SM3 hash");
-    }
+	try {
+		const tmpFile = path.join(os.tmpdir(), `gmssl_sm3_${Date.now()}.py`);
+		fs.writeFileSync(tmpFile, pythonScript);
 
-    return result.hash;
-  } catch (error) {
-    console.warn(`[GmSSL] SM3 hash calculation failed, falling back to mock: ${error}`);
-    return calculateMockSm3Hash(data);
-  }
+		const { stdout } = await execAsync(`python3 "${tmpFile}"`);
+		const result = JSON.parse(stdout.trim());
+
+		fs.unlinkSync(tmpFile);
+
+		if (!result.success) {
+			throw new Error(result.error || "Failed to calculate SM3 hash");
+		}
+
+		console.log(`[GmSSL SM3] Input length: ${dataBuffer.length} bytes, Hash: ${result.hash}`);
+		return result.hash;
+	} catch (error) {
+		throw new Error(`SM3 hash calculation failed: ${error}`);
+	}
 }
 
 /**
  * Sign message with SM2 private key
- * @param message - Message to sign (hex string)
+ * @param messageHash - Message hash (hex string of SM3 hash)
  * @param privateKey - Private key (hex string)
  * @param userId - User ID for identification (optional)
  */
-export async function signWithSm2(message: string, privateKey: string, userId?: string): Promise<string> {
-  // 如果 gmssl 不可用，使用 mock 签名
-  if (!gmSSLAvailable) {
-    console.log("[GmSSL] Using MOCK SM2 signature");
-    // 生成伪签名（使用 HMAC）
-    const signature = crypto
-      .createHmac("sha256", privateKey)
-      .update(message)
-      .digest("hex")
-      .toUpperCase();
-    return signature;
-  }
+export async function signWithSm2(
+	messageHash: string,
+	privateKey: string,
+	userId?: string
+): Promise<string> {
+	// Generate random K value for signing
+	const K = crypto.randomBytes(32).toString("hex");
 
-  const pythonScript = `
-import gmssl
-import json
+	const pythonScript = `
+	import binascii
+	import json
+	from gmssl.sm2 import CryptSM2
 
-try:
-    # Create SM2 key object
-    key = gmssl.Sm2Key()
-    key.set_private_key(bytes.fromhex('${privateKey}'))
-    
-    # Sign message
-    message_bytes = bytes.fromhex('${message}')
-    signature = key.sign(message_bytes)
-    
-    result = {
-        "success": True,
-        "signature": signature.hex()
-    }
-except Exception as e:
-    result = {
-        "success": False,
-        "error": str(e)
-    }
+	try:
+		# Create SM2 instance with private key
+	sm2_crypt = CryptSM2(private_key='${privateKey}', public_key='')
 
-print(json.dumps(result))
-`;
+	# Convert hash from hex string to bytes
+	message_bytes = binascii.unhexlify('${messageHash}')
 
-  try {
-    const tmpFile = path.join(os.tmpdir(), `gmssl_sign_${Date.now()}.py`);
-    fs.writeFileSync(tmpFile, pythonScript);
+	# Sign the message hash with K parameter
+	signature = sm2_crypt.sign(message_bytes, '${K}')
 
-    const { stdout } = await execAsync(`python3 "${tmpFile}"`);
-    const result = JSON.parse(stdout.trim());
+	result = {
+		"success": True,
+		"signature": signature
+	}
+	except Exception as e:
+		result = {
+		"success": False,
+		"error": str(e)
+	}
 
-    fs.unlinkSync(tmpFile);
+	print(json.dumps(result))
+	`;
 
-    if (!result.success) {
-      throw new Error(result.error || "Failed to sign message");
-    }
+	try {
+		const tmpFile = path.join(os.tmpdir(), `gmssl_sign_${Date.now()}.py`);
+		fs.writeFileSync(tmpFile, pythonScript);
 
-    return result.signature;
-  } catch (error) {
-    console.warn(`[GmSSL] SM2 signing failed, falling back to mock: ${error}`);
-    const signature = crypto
-      .createHmac("sha256", privateKey)
-      .update(message)
-      .digest("hex")
-      .toUpperCase();
-    return signature;
-  }
+		const { stdout } = await execAsync(`python3 "${tmpFile}"`);
+		const result = JSON.parse(stdout.trim());
+
+		fs.unlinkSync(tmpFile);
+
+		if (!result.success) {
+			throw new Error(result.error || "Failed to sign message");
+		}
+
+		console.log(`[GmSSL Sign] Signature created: ${result.signature.substring(0, 32)}...`);
+		return result.signature;
+	} catch (error) {
+		throw new Error(`SM2 signing failed: ${error}`);
+	}
 }
 
 /**
  * Verify SM2 signature
- * @param message - Message (hex string)
+ * @param messageHash - Message hash (hex string of SM3 hash)
  * @param signature - Signature (hex string)
  * @param publicKey - Public key (hex string)
  */
-export async function verifyWithSm2(message: string, signature: string, publicKey: string): Promise<boolean> {
-  // 如果 gmssl 不可用，使用 mock 验证
-  if (!gmSSLAvailable) {
-    console.log("[GmSSL] Using MOCK SM2 verification");
-    // 简单的 mock 验证：检查签名长度和格式
-    return signature.length > 0 && /^[0-9A-F]+$/.test(signature);
-  }
+export async function verifyWithSm2(
+	messageHash: string,
+	signature: string,
+	publicKey: string
+): Promise<boolean> {
+	const pythonScript = `
+	import binascii
+	import json
+	from gmssl.sm2 import CryptSM2
 
-  const pythonScript = `
-import gmssl
-import json
+	try:
+		# Create SM2 instance with public key
+	sm2_verify = CryptSM2(private_key='', public_key='${publicKey}')
 
-try:
-    # Create SM2 key object
-    key = gmssl.Sm2Key()
-    key.set_public_key(bytes.fromhex('${publicKey}'))
-    
-    # Verify signature
-    message_bytes = bytes.fromhex('${message}')
-    signature_bytes = bytes.fromhex('${signature}')
-    
-    is_valid = key.verify(signature_bytes, message_bytes)
-    
-    result = {
-        "success": True,
-        "isValid": is_valid
-    }
-except Exception as e:
-    result = {
-        "success": False,
-        "error": str(e),
-        "isValid": False
-    }
+	# Convert hash and signature from hex strings to bytes
+	message_bytes = binascii.unhexlify('${messageHash}')
+	signature_bytes = binascii.unhexlify('${signature}')
 
-print(json.dumps(result))
-`;
+	# Verify the signature
+	is_valid = sm2_verify.verify(signature_bytes, message_bytes)
 
-  try {
-    const tmpFile = path.join(os.tmpdir(), `gmssl_verify_${Date.now()}.py`);
-    fs.writeFileSync(tmpFile, pythonScript);
+	result = {
+		"success": True,
+		"isValid": bool(is_valid)
+	}
+	except Exception as e:
+		result = {
+		"success": False,
+		"error": str(e),
+		"isValid": False
+	}
 
-    const { stdout } = await execAsync(`python3 "${tmpFile}"`);
-    const result = JSON.parse(stdout.trim());
+	print(json.dumps(result))
+	`;
 
-    fs.unlinkSync(tmpFile);
+	try {
+		const tmpFile = path.join(os.tmpdir(), `gmssl_verify_${Date.now()}.py`);
+		fs.writeFileSync(tmpFile, pythonScript);
 
-    return result.isValid || false;
-  } catch (error) {
-    console.warn(`[GmSSL] SM2 verification failed, falling back to mock: ${error}`);
-    // Mock 验证：只检查格式
-    return signature.length > 0 && /^[0-9A-F]+$/.test(signature);
-  }
+		const { stdout } = await execAsync(`python3 "${tmpFile}"`);
+		const result = JSON.parse(stdout.trim());
+
+		fs.unlinkSync(tmpFile);
+
+		console.log(`[GmSSL Verify] Result:`, result);
+
+		// Explicitly return the boolean value
+		if (result.success === false) {
+			console.error(`[GmSSL Verify] Error: ${result.error}`);
+			return false;
+		}
+
+		return result.isValid === true;
+	} catch (error) {
+		console.error(`[GmSSL Verify] Failed: ${error}`);
+		return false;
+	}
 }
 
-/**
- * Calculate file hash (SM3)
- * @param filePath - Path to file
- */
-export async function calculateFileHashSm3(filePath: string): Promise<string> {
-  // 如果 gmssl 不可用，使用 mock 数据
-  if (!gmSSLAvailable) {
-    console.log("[GmSSL] Using MOCK file hash calculation");
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
-    }
-    const fileContent = fs.readFileSync(filePath);
-    return calculateMockSm3Hash(fileContent);
-  }
-
-  const pythonScript = `
-import gmssl
-import json
-
-try:
-    sm3 = gmssl.Sm3()
-    
-    # Read file and calculate hash
-    with open('${filePath.replace(/'/g, "\\'")}', 'rb') as f:
-        while True:
-            chunk = f.read(8192)
-            if not chunk:
-                break
-            sm3.update(chunk)
-    
-    digest = sm3.digest()
-    
-    result = {
-        "success": True,
-        "hash": digest.hex()
-    }
-except Exception as e:
-    result = {
-        "success": False,
-        "error": str(e)
-    }
-
-print(json.dumps(result))
-`;
-
-  try {
-    const tmpFile = path.join(os.tmpdir(), `gmssl_filehash_${Date.now()}.py`);
-    fs.writeFileSync(tmpFile, pythonScript);
-
-    const { stdout } = await execAsync(`python3 "${tmpFile}"`);
-    const result = JSON.parse(stdout.trim());
-
-    fs.unlinkSync(tmpFile);
-
-    if (!result.success) {
-      throw new Error(result.error || "Failed to calculate file hash");
-    }
-
-    return result.hash;
-  } catch (error) {
-    console.warn(`[GmSSL] File hash calculation failed, falling back to mock: ${error}`);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
-    }
-    const fileContent = fs.readFileSync(filePath);
-    return calculateMockSm3Hash(fileContent);
-  }
-}
