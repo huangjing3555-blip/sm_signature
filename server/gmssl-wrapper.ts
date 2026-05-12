@@ -1,9 +1,3 @@
-/**
- * GmSSL Wrapper - Provides Python subprocess-based access to gmssl library
- * This module executes Python scripts that use the gmssl library for SM2/SM3 operations
- * Using gmssl 3.2.2 API: CryptSM2 and sm3_hash
- */
-
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
@@ -19,8 +13,9 @@ const execAsync = promisify(exec);
  */
 export async function initGmssl(): Promise<boolean> {
 	try {
-		// Check if gmssl is installed
-		const { stdout } = await execAsync("python3 -c 'from gmssl.sm2 import CryptSM2; from gmssl.sm3 import sm3_hash; print(\"GmSSL initialized\")'");
+		const { stdout } = await execAsync(
+			"python3 -c 'from gmssl.sm2 import CryptSM2; from gmssl.sm3 import sm3_hash; print(\"GmSSL initialized\")'"
+		);
 		console.log("[GmSSL] Initialized successfully:", stdout.trim());
 		return true;
 	} catch (error) {
@@ -32,37 +27,42 @@ export async function initGmssl(): Promise<boolean> {
 /**
  * Generate SM2 key pair
  * Returns { publicKey, privateKey } in hex format
+ *
+ * Fix: CryptSM2 does NOT auto-compute public_key from private_key.
+ * Must use sm2._kg(int(private_key, 16), ecc_table['g']) to derive it.
  */
 export async function generateSm2KeyPair(): Promise<{
 	publicKey: string;
 	privateKey: string;
 }> {
-	const pythonScript = `
-	import secrets
-	import json
-	from gmssl.sm2 import CryptSM2
-
-	try:
-		# Generate random private key (32 bytes = 64 hex characters)
-	private_key = secrets.token_hex(32)
-
-	# Create SM2 instance and get public key
-	sm2_crypt = CryptSM2(private_key=private_key, public_key='')
-	public_key = sm2_crypt.public_key
-
-	result = {
-		"success": True,
-		"publicKey": public_key,
-		"privateKey": private_key
-	}
-	except Exception as e:
-		result = {
-		"success": False,
-		"error": str(e)
-	}
-
-	print(json.dumps(result))
-	`;
+	// Write Python script to a temp file with correct indentation
+	const pythonScript = [
+		"import secrets",
+		"import json",
+		"from gmssl.sm2 import CryptSM2, default_ecc_table",
+		"",
+		"try:",
+		"    # Generate random private key (32 bytes = 64 hex characters)",
+		"    private_key = secrets.token_hex(32)",
+		"",
+		"    # CryptSM2 does NOT auto-compute public key - must derive it manually",
+		"    sm2_crypt = CryptSM2(private_key=private_key, public_key='')",
+		"    k_int = int(private_key, 16)",
+		"    public_key = sm2_crypt._kg(k_int, default_ecc_table['g'])",
+		"",
+		"    result = {",
+		"        'success': True,",
+		"        'publicKey': public_key,",
+		"        'privateKey': private_key",
+		"    }",
+		"except Exception as e:",
+		"    result = {",
+		"        'success': False,",
+		"        'error': str(e)",
+		"    }",
+		"",
+		"print(json.dumps(result))",
+	].join("\n");
 
 	try {
 		const tmpFile = path.join(os.tmpdir(), `gmssl_keygen_${Date.now()}.py`);
@@ -90,39 +90,37 @@ export async function generateSm2KeyPair(): Promise<{
 /**
  * Calculate SM3 hash
  * @param data - Input data as string or Buffer
+ *
+ * Fix: sm3_hash() accepts a list of integers (or bytearray).
+ * The original script had broken indentation from TS template literals.
+ * Fixed by building the script as an array of lines joined with newlines.
  */
 export async function calculateSm3Hash(data: string | Buffer): Promise<string> {
-	// Convert data to Buffer
+	// Convert data to Buffer then to base64 for safe transfer to Python
 	const dataBuffer = typeof data === "string" ? Buffer.from(data, "utf-8") : data;
 	const dataBase64 = dataBuffer.toString("base64");
 
-	const pythonScript = `
-	import base64
-	import json
-	from gmssl.sm3 import sm3_hash
-
-	try:
-		# Decode base64 data
-	input_data = base64.b64decode('${dataBase64}')
-
-	# Convert to bytearray for sm3_hash
-		input_bytearray = bytearray(input_data)
-
-	# Calculate SM3 hash
-	hash_result = sm3_hash(input_bytearray)
-
-	result = {
-		"success": True,
-		"hash": hash_result
-	}
-	except Exception as e:
-		result = {
-		"success": False,
-		"error": str(e)
-	}
-
-	print(json.dumps(result))
-	`;
+	const pythonScript = [
+		"import base64",
+		"import json",
+		"from gmssl.sm3 import sm3_hash",
+		"",
+		"try:",
+		`    input_data = base64.b64decode('${dataBase64}')`,
+			"    # sm3_hash accepts list of ints or bytearray",
+		"    hash_result = sm3_hash(list(bytearray(input_data)))",
+		"    result = {",
+		"        'success': True,",
+		"        'hash': hash_result",
+		"    }",
+		"except Exception as e:",
+		"    result = {",
+		"        'success': False,",
+		"        'error': str(e)",
+		"    }",
+		"",
+		"print(json.dumps(result))",
+	].join("\n");
 
 	try {
 		const tmpFile = path.join(os.tmpdir(), `gmssl_sm3_${Date.now()}.py`);
@@ -147,8 +145,14 @@ export async function calculateSm3Hash(data: string | Buffer): Promise<string> {
 /**
  * Sign message with SM2 private key
  * @param messageHash - Message hash (hex string of SM3 hash)
- * @param privateKey - Private key (hex string)
- * @param userId - User ID for identification (optional)
+ * @param privateKey  - Private key (hex string)
+ * @param userId      - User ID for identification (optional, unused in crypto)
+ *
+ * Fix: sign() expects a bytes object for the message hash.
+ * Use bytes.fromhex() to convert the hex string to bytes.
+ * Also need to provide the public key so SM2 instance is fully initialised
+ * (derive it from private key using _kg).
+ * Original script had broken indentation from TS template literals.
  */
 export async function signWithSm2(
 	messageHash: string,
@@ -158,33 +162,42 @@ export async function signWithSm2(
 	// Generate random K value for signing
 	const K = crypto.randomBytes(32).toString("hex");
 
-	const pythonScript = `
-	import binascii
-	import json
-	from gmssl.sm2 import CryptSM2
-
-	try:
-		# Create SM2 instance with private key
-	sm2_crypt = CryptSM2(private_key='${privateKey}', public_key='')
-
-	# Convert hash from hex string to bytes
-	message_bytes = binascii.unhexlify('${messageHash}')
-
-	# Sign the message hash with K parameter
-	signature = sm2_crypt.sign(message_bytes, '${K}')
-
-	result = {
-		"success": True,
-		"signature": signature
-	}
-	except Exception as e:
-		result = {
-		"success": False,
-		"error": str(e)
-	}
-
-	print(json.dumps(result))
-	`;
+	const pythonScript = [
+		"import json",
+		"from gmssl.sm2 import CryptSM2, default_ecc_table",
+		"",
+		"try:",
+		`    private_key = '${privateKey}'`,
+			`    message_hash_hex = '${messageHash}'`,
+			`    K = '${K}'`,
+			"",
+		"    # Derive public key from private key",
+		"    sm2_tmp = CryptSM2(private_key=private_key, public_key='')",
+		"    public_key = sm2_tmp._kg(int(private_key, 16), default_ecc_table['g'])",
+		"",
+		"    # Create SM2 instance with both keys",
+		"    sm2_crypt = CryptSM2(private_key=private_key, public_key=public_key)",
+		"",
+		"    # sign() expects bytes, convert hex string to bytes",
+		"    message_bytes = bytes.fromhex(message_hash_hex)",
+		"",
+		"    # Sign - returns hex string r||s (128 hex chars = 64 bytes)",
+		"    signature = sm2_crypt.sign(message_bytes, K)",
+		"    if signature is None:",
+		"        raise ValueError('Signing failed: invalid K or hash (R=0 or S=0). Retry with different K.')",
+		"",
+		"    result = {",
+		"        'success': True,",
+		"        'signature': signature",
+		"    }",
+		"except Exception as e:",
+		"    result = {",
+		"        'success': False,",
+		"        'error': str(e)",
+		"    }",
+		"",
+		"print(json.dumps(result))",
+	].join("\n");
 
 	try {
 		const tmpFile = path.join(os.tmpdir(), `gmssl_sign_${Date.now()}.py`);
@@ -209,43 +222,51 @@ export async function signWithSm2(
 /**
  * Verify SM2 signature
  * @param messageHash - Message hash (hex string of SM3 hash)
- * @param signature - Signature (hex string)
- * @param publicKey - Public key (hex string)
+ * @param signature   - Signature (hex string, r||s format, 128 hex chars)
+ * @param publicKey   - Public key (hex string, 128 hex chars)
+ *
+ * Fix: verify() expects:
+ *   - Sign: hex STRING (not bytes!) - the r||s signature
+ *   - data: bytes object
+ * Original code called binascii.unhexlify(signature) converting it to bytes,
+ * then passed bytes to verify(), causing "invalid literal for int() with base 16"
+ * error inside verify(). Fixed by passing the signature hex string directly.
  */
 export async function verifyWithSm2(
 	messageHash: string,
 	signature: string,
 	publicKey: string
 ): Promise<boolean> {
-	const pythonScript = `
-	import binascii
-	import json
-	from gmssl.sm2 import CryptSM2
-
-	try:
-		# Create SM2 instance with public key
-	sm2_verify = CryptSM2(private_key='', public_key='${publicKey}')
-
-	# Convert hash and signature from hex strings to bytes
-	message_bytes = binascii.unhexlify('${messageHash}')
-	signature_bytes = binascii.unhexlify('${signature}')
-
-	# Verify the signature
-	is_valid = sm2_verify.verify(signature_bytes, message_bytes)
-
-	result = {
-		"success": True,
-		"isValid": bool(is_valid)
-	}
-	except Exception as e:
-		result = {
-		"success": False,
-		"error": str(e),
-		"isValid": False
-	}
-
-	print(json.dumps(result))
-	`;
+	const pythonScript = [
+		"import json",
+		"from gmssl.sm2 import CryptSM2",
+		"",
+		"try:",
+		`    public_key = '${publicKey}'`,
+			`    message_hash_hex = '${messageHash}'`,
+			`    signature_hex = '${signature}'`,
+			"",
+		"    # Create SM2 instance with public key only",
+		"    sm2_verify = CryptSM2(private_key='', public_key=public_key)",
+		"",
+		"    # verify() expects: Sign as hex STRING, data as bytes",
+		"    # Do NOT convert signature to bytes - pass hex string directly",
+		"    message_bytes = bytes.fromhex(message_hash_hex)",
+		"    is_valid = sm2_verify.verify(signature_hex, message_bytes)",
+		"",
+		"    result = {",
+		"        'success': True,",
+		"        'isValid': bool(is_valid)",
+		"    }",
+		"except Exception as e:",
+		"    result = {",
+		"        'success': False,",
+		"        'error': str(e),",
+		"        'isValid': False",
+		"    }",
+		"",
+		"print(json.dumps(result))",
+	].join("\n");
 
 	try {
 		const tmpFile = path.join(os.tmpdir(), `gmssl_verify_${Date.now()}.py`);
@@ -258,7 +279,6 @@ export async function verifyWithSm2(
 
 		console.log(`[GmSSL Verify] Result:`, result);
 
-		// Explicitly return the boolean value
 		if (result.success === false) {
 			console.error(`[GmSSL Verify] Error: ${result.error}`);
 			return false;
@@ -270,4 +290,3 @@ export async function verifyWithSm2(
 		return false;
 	}
 }
-
