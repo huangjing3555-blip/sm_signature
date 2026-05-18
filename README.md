@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/platform-Orange%20Pi%205%20Plus-orange.svg)
 ![Node.js](https://img.shields.io/badge/node.js-v22.13.0-green.svg)
 
-一个基于 **Orange Pi 5 Plus** 的专业级国密算法应用平台，提供安全、可靠的 SM2 数字签名和 SM3 哈希计算服务。
+国密 SM2/SM3 数字签名与验签系统，是基于 Orange Pi 5 Plus 与 Node.js v22.13.0 开发的国密算法应用平台，采用 MIT 协议开源。系统集成 GmSSL 库实现真实的 SM2 密钥生成、数字签名 / 验签与 SM3 哈希计算，支持文件处理、操作审计、数据库管理与 S3 存储，并通过 Systemd 开机自启、Nginx 反向代理实现稳定部署，界面提供安全、可靠的国产化密码学服务。
 
 ## 🎯 核心特性
 
@@ -313,36 +313,9 @@ pnpm test -- --coverage
 3. 提交更改 (`git commit -m 'Add amazing feature'`)
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启 Pull Request
-
-## 📞 技术支持
-
-- **文档**：[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-- **问题**：[GitHub Issues](https://github.com/your-repo/sm-signature-system/issues)
-- **讨论**：[GitHub Discussions](https://github.com/your-repo/sm-signature-system/discussions)
-- **邮件**：support@example.com
-
-## 🙏 致谢
-
-- [GmSSL](https://github.com/guanzhi/GmSSL) - 国密算法库
-- [Orange Pi](https://www.orangepi.org/) - 开发板
-- [Node.js](https://nodejs.org/) - 运行时环境
-- [React](https://react.dev/) - 前端框架
-- [Tailwind CSS](https://tailwindcss.com/) - 样式框架
-
-## 📄 更新日志
-
-### v1.0.0 (2026-05-03)
-
-- ✅ 首次发布
-- ✅ SM2 密钥对生成
-- ✅ SM3 哈希计算
-- ✅ 数字签名和验证
-- ✅ 完整的部署文档
-- ✅ 手绘草图美学界面
-
----
-
-**作者**: Manus AI  
-**最后更新**: 2026年5月3日  
-**版本**: 1.0.0  
-**平台**: Orange Pi 5 Plus (RK3588)
+## 项目声明Project Statement
+本项目的作者及单位:
+The author and affiliation of this project:
+- 项目名称(Project Name):SM2SM3-DSVS
+- 项者 (Author) : Jing Huang, Donghong Cai
+- 作者单位(Affiliation):暨南大学网络空间安全学院(College of Cyber Security,Jinan University)
