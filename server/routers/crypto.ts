@@ -9,7 +9,6 @@ import {
   calculateSm3Hash,
   signWithSm2,
   verifyWithSm2,
-  calculateFileHashSm3,
 } from "../gmssl-wrapper";
 import {
   saveSm2Key,
