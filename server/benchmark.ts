@@ -19,7 +19,7 @@ async function runBenchmark() {
 
   await initGmssl();
 
-  const TEST_COUNT = 100;
+  const TEST_COUNT = 1000;
 
   const keyGenCounter =
     new PerformanceCounter();
